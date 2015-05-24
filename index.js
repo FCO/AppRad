@@ -62,14 +62,8 @@ AppRad.prototype = {
 	},
 
 	register:		function(name, func, help) {
-		var _parent;
-		if(module.parent)
-			_parent = module.parent.exports;
-		else
-			_parent = global;
-
 		if(!(name in this._cmds)) {
-			func = func || _parent[name];
+			func = func || this.parentModule[name];
 
 			if(!func)
 				throw new Error("no func");
@@ -139,16 +133,10 @@ AppRad.prototype = {
 			}];
 		}
 
-		var _parent;
-		if(module.parent)
-			_parent = module.parent.exports;
-		else
-			_parent = global;
-
-		Object.getOwnPropertyNames(_parent)
+		Object.getOwnPropertyNames(this.parentModule)
 			.filter(function(funcName) {
-				return _parent[funcName] instanceof Function;
-			})
+				return this.parentModule[funcName] instanceof Function;
+			}.bind(this))
 			.filter(function(funcName) {
 				return funcName[0].toLowerCase() === funcName[0];
 			})
@@ -178,11 +166,15 @@ AppRad.prototype = {
 		if(this._debug) console.log.apply(console, arguments);
 	},
 
-	execute:		function(cmd) {
-		console.log(this._cmds);
+	execute:		function() {
+		var args = Array.prototype.slice.call(arguments);
+		var cmd = args.shift();
+		if(!this.isCommand(cmd)) throw new Error(cmd + " is not a command");
+		return this._cmds[cmd].func.apply(this, args);
 	},
 
 	isCommand:		function(cmdName) {
+		return cmdName in this._cmds;
 	},
 
 	/* control functions */
@@ -195,16 +187,10 @@ AppRad.prototype = {
 	},
 
 	_runControlFunc:	function() {
-		var _parent;
-		if(module.parent)
-			_parent = module.parent.exports;
-		else
-			_parent = global;
-
 		var args = Array.prototype.slice.call(arguments);
 		var name = args.shift();
-		if(_parent[name])
-			return _parent[name].apply(this, args);
+		if(this.parentModule[name])
+			return this.parentModule[name].apply(this, args);
 		return this._controlFuncs[name].apply(this, args);
 	},
 
@@ -228,7 +214,27 @@ AppRad.prototype = {
 	/**/
 
 	_setup:			function() {
-		return setup.call(this);
+		return this._runControlFunc("setup");
+	},
+
+	_parseCliArgs:		function(argv) {
+
+	},
+
+	get parentModule()	{
+		if(this._parentModule)
+			return this._parentModule;
+
+		var _parent;
+		if(module.parent)
+			_parent = module.parent.exports;
+		else
+			_parent = global;
+
+		if("loaded" in _parent && _parent.loaded)
+			this._parentModule = _parent;
+
+		return _parent;
 	}
 };
 
