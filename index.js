@@ -3,6 +3,7 @@ function AppRad() {
 	this._cmdNameIndex	= 1;
 	this._conf		= {};
 	this._debug		= false;
+	this._stash		= {};
 }
 
 AppRad.prototype = {
@@ -15,6 +16,10 @@ AppRad.prototype = {
 		"require",		"setImmediate",		"setInterval",
 		"setTimeout",		"stream",		"unescape"
 	],
+	default_help_msg:	"",
+	get stash()		{
+		return this._stash;
+	},
 	get setDebug()		{
 		this._debug = true;
 		return this;
@@ -30,8 +35,9 @@ AppRad.prototype = {
 		this.cmd = cmd;
 	},
 
-	commands:		function() {
-		return Object.keys(this._cmds);
+	get commands()		{
+		this.debug(Object.getOwnPropertyNames(this._cmds));
+		return Object.getOwnPropertyNames(this._cmds);
 	},
 
 	createCommandName:	function() {
@@ -51,10 +57,19 @@ AppRad.prototype = {
 		return this._conf;
 	},
 
+	runOnCli:			function() {
+		if(this.parentModule.parent == null)
+			return this.run.apply(this, arguments);
+	},
+
 	run:			function() {
-		this._setup();
-		//this._parseArgs(process.argv);
-		this.execute(this.command);
+		this._runControlFunc("setup");
+		var args		= this._parseCliArgs(process.argv.slice(2));
+		this.stash.options	= args.options;
+		this.stash.args		= args.args;
+		this.cmd		= this.stash.args[0];
+		this.output		= this.execute.apply(this, this.stash.args);
+		this._runControlFunc("postProcess");
 	},
 
 	get registerCommand()	{
@@ -62,8 +77,9 @@ AppRad.prototype = {
 	},
 
 	register:		function(name, func, help) {
+		//console.log("register(%s, %s, %s)", name, func, help);
 		if(!(name in this._cmds)) {
-			func = func || this.parentModule[name];
+			func = func || this.parentModuleExports[name];
 
 			if(!func)
 				throw new Error("no func");
@@ -133,9 +149,9 @@ AppRad.prototype = {
 			}];
 		}
 
-		Object.getOwnPropertyNames(this.parentModule)
+		Object.getOwnPropertyNames(this.parentModuleExports)
 			.filter(function(funcName) {
-				return this.parentModule[funcName] instanceof Function;
+				return this.parentModuleExports[funcName] instanceof Function;
 			}.bind(this))
 			.filter(function(funcName) {
 				return funcName[0].toLowerCase() === funcName[0];
@@ -153,6 +169,29 @@ AppRad.prototype = {
 				this.register(funcName);
 			}.bind(this))
 		;
+
+		this.register("help", function() {
+			var help = "Usage: " + process.argv[1] + " command [arguments]\n\n"
+				+ "Available Commands:\n";
+
+			this.debug("cmd: %s", this.cmd);
+			this.commands.filter(function(cmd){
+				return cmd !== "index" && cmd !== "invalid";
+			}).forEach(function(cmd) {
+				this.debug("cmd: %s", cmd);
+				help += "\t" + cmd + ":\t\t" + this._getHelpMsgForCmd(cmd) + "\n";
+			}.bind(this));
+
+			return help;
+		}, "Shows this help message.");
+
+		this.register("index", function() {
+			return this.execute("help");;
+		}, "Shows this help message.");
+
+		this.register("invalid", function() {
+			return this.execute("index");;
+		}, "Shows this help message.");
 	},
 
 	get unregisterCommand()	{
@@ -169,7 +208,9 @@ AppRad.prototype = {
 	execute:		function() {
 		var args = Array.prototype.slice.call(arguments);
 		var cmd = args.shift();
-		if(!this.isCommand(cmd)) throw new Error(cmd + " is not a command");
+		if(cmd === "") cmd = "default";
+		else if(!this.isCommand(cmd)) cmd = "invalid";
+		if(!this._cmds[cmd]) throw new Error("Func '" + cmd + "' doesn't exists");
 		return this._cmds[cmd].func.apply(this, args);
 	},
 
@@ -189,14 +230,14 @@ AppRad.prototype = {
 	_runControlFunc:	function() {
 		var args = Array.prototype.slice.call(arguments);
 		var name = args.shift();
-		if(this.parentModule[name])
-			return this.parentModule[name].apply(this, args);
+		if(this.parentModuleExports[name])
+			return this.parentModuleExports[name].apply(this, args);
 		return this._controlFuncs[name].apply(this, args);
 	},
 
 	_controlFuncs:		{
 		setup:		function() {
-			console.log("control func setup");
+			this.registerCommands();
 		},
 
 		teardown:	function() {
@@ -213,26 +254,59 @@ AppRad.prototype = {
 
 	/**/
 
-	_setup:			function() {
-		return this._runControlFunc("setup");
+	_getHelpMsgForCmd:	function(cmd) {
+		if(this._cmds[cmd])
+			return this._cmds[cmd].help || this.default_help_msg;
 	},
 
 	_parseCliArgs:		function(argv) {
-
+		var options = {};
+		var args = [];
+		for(var i = 0; i < argv.length; i++){
+			if(argv[i] === "--") {
+				args.push.apply(args, argv.slice(i));
+				break;
+			} else if(argv[i].substr(0, 2) === "--") {
+				var opt = argv[i].replace(/^--/, "").split("=");
+				if(opt[1] !== undefined)
+					args[opt[0]] = opt[1];
+				else
+					if(argv[opt[0]] === undefined)
+						args[opt[0]] = true;
+					else if(argv[opt[0]] === true)
+						args[opt[0]] = 2;
+				args[opt[0]] = opt[1] !== undefined ? opt[1] : true;
+				if(opt[1] === undefined && opt[0].substr(0, 3) === "no-")
+					args[opt[0].replace(/^no-/, "")] = false;
+			} else if(argv[i].substr(0, 1) === "-") {
+				argv[i].substr(1).split("").forEach(function(letter){
+					args[letter] = true;
+				});
+			} else {
+				args.push(argv[i]);
+			}
+		}
+		return {args: args, options: options}
 	},
 
 	get parentModule()	{
 		if(this._parentModule)
 			return this._parentModule;
 
-		var _parent;
-		if(module.parent)
-			_parent = module.parent.exports;
-		else
-			_parent = global;
+		var _parent = module.parent;
 
 		if("loaded" in _parent && _parent.loaded)
 			this._parentModule = _parent;
+
+		return _parent;
+	},
+
+	get parentModuleExports()	{
+		var _parent;
+		if(module.parent)
+			_parent = this.parentModule.exports;
+		else
+			_parent = global;
 
 		return _parent;
 	}

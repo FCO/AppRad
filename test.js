@@ -8,7 +8,11 @@ module.exports = {
 	bli:	function(){return "bli"}
 };
 
-app.registerCommands();
-console.log(app._cmds);
+//app.registerCommands();
+//console.log(app._cmds);
 //console.log("bla is command: %s", app.isCommand("bla"));
-console.log(app.execute("bla"));
+//console.log(app.execute("bla"));
+//console.log("parent: ", app.parentModule);
+
+
+app.run();
