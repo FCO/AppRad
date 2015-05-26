@@ -1,11 +1,15 @@
 var app = require("./index.js").setDebug;
 
 module.exports = {
-	bla:	function(){return "bla"},
+	bla:		function(){return "bla"},
 
-	_ble:	 function(){return "ble"},
+	_ble:	 	function(){return "ble"}
+			.Register("notBle", "help message"),
 
-	bli:	function(){return "bli"}
+	bli:		function(){return "bli"}
+			.Help("Custom help message"),
+
+	//invalid:	function(){return "invalid"},
 };
 
 //app.registerCommands();
@@ -15,4 +19,4 @@ module.exports = {
 //console.log("parent: ", app.parentModule);
 
 
-app.run();
+app.runOnCli();

@@ -1,4 +1,15 @@
 function AppRad() {
+	Function.prototype.Help = function(help){
+		this.help = help;
+		return this;
+	};
+
+	var app = this;
+	Function.prototype.Register = function(name, help){
+		app.register(name, this, help);
+		return this;
+	};
+
 	this._cmds		= {};
 	this._cmdNameIndex	= 1;
 	this._conf		= {};
@@ -36,7 +47,6 @@ AppRad.prototype = {
 	},
 
 	get commands()		{
-		this.debug(Object.getOwnPropertyNames(this._cmds));
 		return Object.getOwnPropertyNames(this._cmds);
 	},
 
@@ -88,9 +98,10 @@ AppRad.prototype = {
 				name = this.createCommandName();
 
 			this._cmds[name] = {};
-			if(func) this._cmds[name].func = func;
+			if(func) this._cmds[name] = func;
 			if(help) this._cmds[name].help = help;
 		}
+		return this._cmds[name];
 	},
 
 	registerCommands:	function() {
@@ -174,24 +185,22 @@ AppRad.prototype = {
 			var help = "Usage: " + process.argv[1] + " command [arguments]\n\n"
 				+ "Available Commands:\n";
 
-			this.debug("cmd: %s", this.cmd);
 			this.commands.filter(function(cmd){
-				return cmd !== "index" && cmd !== "invalid";
-			}).forEach(function(cmd) {
-				this.debug("cmd: %s", cmd);
+				return !this._cmds[cmd].skipHelp;
+			}.bind(this)).forEach(function(cmd) {
 				help += "\t" + cmd + ":\t\t" + this._getHelpMsgForCmd(cmd) + "\n";
 			}.bind(this));
 
 			return help;
 		}, "Shows this help message.");
 
-		this.register("index", function() {
-			return this.execute("help");;
-		}, "Shows this help message.");
+		this.register("default", function() {
+			return this.execute("help");
+		}).skipHelp = true;
 
 		this.register("invalid", function() {
-			return this.execute("index");;
-		}, "Shows this help message.");
+			return this.execute("default");
+		}).skipHelp = true;
 	},
 
 	get unregisterCommand()	{
@@ -208,10 +217,10 @@ AppRad.prototype = {
 	execute:		function() {
 		var args = Array.prototype.slice.call(arguments);
 		var cmd = args.shift();
-		if(cmd === "") cmd = "default";
+		if(!cmd) cmd = "default";
 		else if(!this.isCommand(cmd)) cmd = "invalid";
 		if(!this._cmds[cmd]) throw new Error("Func '" + cmd + "' doesn't exists");
-		return this._cmds[cmd].func.apply(this, args);
+		return this._cmds[cmd].apply(this, args);
 	},
 
 	isCommand:		function(cmdName) {
