@@ -25,7 +25,7 @@ module.exports = {
 		setTimeout(function(){
 			console.log("did it!");
 			done("correct value");
-		}, 1000);
+		}, this.options.time || 1000);
 	}
 
 	//invalid:	function(){return "invalid"},
