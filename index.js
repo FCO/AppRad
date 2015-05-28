@@ -5,8 +5,29 @@ function AppRad() {
 	};
 
 	var app = this;
-	Function.prototype.Register = function(name, help){
+	Function.prototype.Register = function(name, help) {
 		app.register(name, this, help);
+		return this;
+	};
+
+	Function.prototype.Map = function() {
+		var func = this;
+		var mapFunc;
+		var args = Array.prototype.slice.call(arguments);
+		if(args.length === 1 && args[0] instanceof Function)
+			mapFunc = args.shift();
+		else {
+			mapFunc = function(run) {
+				return run.apply(null, args.map(function(item){
+					return item instanceof Function
+						? item.call(app)
+						: item
+				}));
+			};
+		}
+		this.mapper = function() {
+			return mapFunc.call(app, func);
+		};
 		return this;
 	};
 
@@ -75,10 +96,10 @@ AppRad.prototype = {
 	run:			function() {
 		this._runControlFunc("setup");
 		var args		= this._parseCliArgs(process.argv.slice(2));
-		this.stash.options	= args.options;
-		this.stash.args		= args.args;
-		this.cmd		= this.stash.args[0];
-		this.output		= this.execute.apply(this, this.stash.args);
+		this.options		= args.options;
+		this.args		= args.args;
+		this.cmd		= this.args[0];
+		this.output		= this.execute.apply(this, this.args);
 		this._runControlFunc("postProcess");
 	},
 
@@ -220,7 +241,7 @@ AppRad.prototype = {
 		if(!cmd) cmd = "default";
 		else if(!this.isCommand(cmd)) cmd = "invalid";
 		if(!this._cmds[cmd]) throw new Error("Func '" + cmd + "' doesn't exists");
-		return this._cmds[cmd].apply(this, args);
+		return (this._cmds[cmd].mapper || this._cmds[cmd]).apply(this, args);
 	},
 
 	isCommand:		function(cmdName) {
@@ -278,18 +299,18 @@ AppRad.prototype = {
 			} else if(argv[i].substr(0, 2) === "--") {
 				var opt = argv[i].replace(/^--/, "").split("=");
 				if(opt[1] !== undefined)
-					args[opt[0]] = opt[1];
+					options[opt[0]] = opt[1];
 				else
 					if(argv[opt[0]] === undefined)
-						args[opt[0]] = true;
+						options[opt[0]] = true;
 					else if(argv[opt[0]] === true)
-						args[opt[0]] = 2;
-				args[opt[0]] = opt[1] !== undefined ? opt[1] : true;
+						options[opt[0]] = 2;
+				options[opt[0]] = opt[1] !== undefined ? opt[1] : true;
 				if(opt[1] === undefined && opt[0].substr(0, 3) === "no-")
-					args[opt[0].replace(/^no-/, "")] = false;
+					options[opt[0].replace(/^no-/, "")] = false;
 			} else if(argv[i].substr(0, 1) === "-") {
 				argv[i].substr(1).split("").forEach(function(letter){
-					args[letter] = true;
+					options[letter] = true;
 				});
 			} else {
 				args.push(argv[i]);
