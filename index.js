@@ -48,12 +48,51 @@ AppRad.prototype = {
 		"require",		"setImmediate",		"setInterval",
 		"setTimeout",		"stream",		"unescape"
 	],
+
 	default_help_msg:	"",
+
 	get stash()		{
 		return this._stash;
 	},
+
 	get setDebug()		{
 		this._debug = true;
+		return this;
+	},
+
+	get exclude()		{
+		//TODO: save on file
+		this.register("exclude", function() {
+			var name = this.args.shift();
+
+			if(this.isCommand(name))
+				this.debug("search and remove the function '" + name + "' from file");
+			else
+				throw new Error("Command '" + name + "' does not exists");
+
+			//TODO: save on file
+		}, "Include a new command");
+		return this;
+	},
+
+	get include()		{
+		//TODO: save on file
+		this.register("include", function() {
+			var code = this.args.pop();
+			var name = this.args.pop() || this.createCommandName();
+
+			new Function(code);
+
+			var newCode = "module.exports." + name + " = function() {\n"
+				+ "\t" + code + "\n"
+				+ "};\n\n"
+			;
+
+			new Function(newCode);
+			this.debug(newCode);
+
+			//TODO: save on file
+		}, "Include a new command");
 		return this;
 	},
 
@@ -73,7 +112,7 @@ AppRad.prototype = {
 
 	createCommandName:	function() {
 		var newName = "cmd" + this._cmdNameIndex++;
-		if(this.isCommand(new_name))
+		if(this.isCommand(newName))
 			return this.createCommandName()
 		return newName;
 	},
@@ -98,8 +137,7 @@ AppRad.prototype = {
 		var args		= this._parseCliArgs(process.argv.slice(2));
 		this.options		= args.options;
 		this.args		= args.args;
-		this.cmd		= this.args[0];
-		this.output		= this.execute.apply(this, this.args);
+		this.output		= this.execute.call(this, this.args.shift());
 		this._runControlFunc("postProcess");
 	},
 
@@ -235,13 +273,11 @@ AppRad.prototype = {
 		if(this._debug) console.log.apply(console, arguments);
 	},
 
-	execute:		function() {
-		var args = Array.prototype.slice.call(arguments);
-		var cmd = args.shift();
+	execute:		function(cmd) {
 		if(!cmd) cmd = "default";
 		else if(!this.isCommand(cmd)) cmd = "invalid";
 		if(!this._cmds[cmd]) throw new Error("Func '" + cmd + "' doesn't exists");
-		return (this._cmds[cmd].mapper || this._cmds[cmd]).apply(this, args);
+		return (this._cmds[cmd].mapper || this._cmds[cmd]).call(this);
 	},
 
 	isCommand:		function(cmdName) {

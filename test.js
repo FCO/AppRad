@@ -1,4 +1,8 @@
-var app = require("./index.js").setDebug;
+var app = require("./index.js")
+	.setDebug
+	.include
+	.exclude
+;
 
 module.exports = {
 	bla:		function(){return "bla"},
