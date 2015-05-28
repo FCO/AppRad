@@ -25,8 +25,8 @@ function AppRad() {
 				}));
 			};
 		}
-		this.mapper = function() {
-			return mapFunc.call(app, func);
+		this.mapper = function(done) {
+			return mapFunc.call(app, func, done);
 		};
 		return this;
 	};
@@ -138,7 +138,8 @@ AppRad.prototype = {
 		this.options		= args.options;
 		this.args		= args.args;
 		this.output		= this.execute.call(this, this.args.shift());
-		this._runControlFunc("postProcess");
+		if(this.output !== undefined)
+			this._runControlFunc("postProcess");
 	},
 
 	get registerCommand()	{
@@ -277,11 +278,20 @@ AppRad.prototype = {
 		if(!cmd) cmd = "default";
 		else if(!this.isCommand(cmd)) cmd = "invalid";
 		if(!this._cmds[cmd]) throw new Error("Func '" + cmd + "' doesn't exists");
-		return (this._cmds[cmd].mapper || this._cmds[cmd]).call(this);
+		return (this._cmds[cmd].mapper || this._cmds[cmd]).call(this, function(output) {
+			this.output = output;
+			this._runControlFunc("postProcess");
+		}.bind(this));
 	},
 
 	isCommand:		function(cmdName) {
 		return cmdName in this._cmds;
+	},
+
+	getCommand:		function(cmdName) {
+		if(!this.isCommand(cmdName))
+			throw "Command not found";
+		return this._cmds.cmdName;
 	},
 
 	/* control functions */

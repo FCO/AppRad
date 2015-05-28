@@ -18,6 +18,15 @@ module.exports = {
 	,
 	blo:		function(num, str){return [num, str]}
 			.Map(42, function(){return "bla" in this.options ? this.options.bla : "another bla"})
+	,
+	blu:		function(){return "blu"},
+
+	async:		function(done){
+		setTimeout(function(){
+			console.log("did it!");
+			done("correct value");
+		}, 1000);
+	}
 
 	//invalid:	function(){return "invalid"},
 };
