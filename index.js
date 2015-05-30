@@ -10,6 +10,11 @@ function AppRad() {
 		return this;
 	};
 
+	Function.prototype.Options = function(options) {
+		this.options = options;
+		return this;
+	};
+
 	Function.prototype.Map = function() {
 		var func = this;
 		var mapFunc;
@@ -77,13 +82,13 @@ AppRad.prototype = {
 
 	get include()		{
 		//TODO: save on file
-		this.register("include", function() {
+		this.register("include", function(done) {
 			var code = this.args.pop();
 			var name = this.args.pop() || this.createCommandName();
 
 			new Function(code);
 
-			var newCode = "module.exports." + name + " = function() {\n"
+			var newCode = "\nmodule.exports." + name + " = function() {\n"
 				+ "\t" + code + "\n"
 				+ "};\n\n"
 			;
@@ -91,7 +96,10 @@ AppRad.prototype = {
 			new Function(newCode);
 			this.debug(newCode);
 
-			//TODO: save on file
+			//TODO: Fix position
+			require("fs").appendFile(process.argv[1], newCode, function(err) {
+				done(err, "File '" + process.argv[1] + "' saved");
+			});
 		}, "Include a new command");
 		return this;
 	},
@@ -278,7 +286,11 @@ AppRad.prototype = {
 		if(!cmd) cmd = "default";
 		else if(!this.isCommand(cmd)) cmd = "invalid";
 		if(!this._cmds[cmd]) throw new Error("Func '" + cmd + "' doesn't exists");
-		return (this._cmds[cmd].mapper || this._cmds[cmd]).call(this, function(output) {
+		return (this._cmds[cmd].mapper || this._cmds[cmd]).call(this, function(error, output) {
+			if(error) {
+				console.error(error);
+				process.exit(1);
+			}
 			this.output = output;
 			this._runControlFunc("postProcess");
 		}.bind(this));
