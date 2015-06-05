@@ -1,7 +1,6 @@
+#!/usr/bin/env node
 var app = require("./index.js")
 	.setDebug
-	.include
-	.exclude
 ;
 
 module.exports = {
@@ -21,11 +20,29 @@ module.exports = {
 	,
 	blu:		function(){return "blu"},
 
+	cmd_muito_muito_grande:		function(){return "blu"}
+			.Help("help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande help do comando muito muito grande ")
+	,
+
 	async:		function(done){
-		setTimeout(function(){
+		setTimeout(function() {
 			console.log("did it!");
-			done("correct value");
+			done(null, "correct value");
 		}, this.options.time || 1000);
+	}
+			.Options({
+				time: {
+					type:	Number
+				}
+			})
+	,
+	http:		function(done) {
+		var server = require("http").createServer(function(req, res) {
+			res.writeHeader(this.options.statusCode || 200, {"content-type": "text/json"});
+			res.end(this.options.response || "OK");
+			server.close(function() {done(null, req);});
+		}.bind(this));
+		server.listen(this.options.port || 8888)
 	}
 
 	//invalid:	function(){return "invalid"},

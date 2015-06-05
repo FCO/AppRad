@@ -250,13 +250,29 @@ AppRad.prototype = {
 		;
 
 		this.register("help", function() {
+			var sprintf = require("printf");
 			var help = "Usage: " + process.argv[1] + " command [arguments]\n\n"
 				+ "Available Commands:\n";
 
+			var maxSize = 0;
 			this.commands.filter(function(cmd){
-				return !this._cmds[cmd].skipHelp;
-			}.bind(this)).forEach(function(cmd) {
-				help += "\t" + cmd + ":\t\t" + this._getHelpMsgForCmd(cmd) + "\n";
+				var ret = !this._cmds[cmd].skipHelp;
+				if(ret) {
+					maxSize = cmd.length > maxSize ? cmd.length : maxSize;
+				}
+				return ret;
+			}.bind(this)).sort().forEach(function(cmd) {
+				var formatedMsg = [];
+				var msgArr = this._getHelpMsgForCmd(cmd).split("");
+				while(msgArr.length) {
+					while(msgArr[0].match(/\s/))
+						msgArr.shift();
+					formatedMsg.push(msgArr.splice(0, 50).join(""));
+				}
+				help += sprintf("\t% -*s :  %-50s\n", cmd, maxSize, formatedMsg[0] || "");
+				formatedMsg.slice(1).forEach(function(line) {
+					help += sprintf("\t% -*s    %-50s\n", "", maxSize, line);
+				});
 			}.bind(this));
 
 			return help;
@@ -344,7 +360,7 @@ AppRad.prototype = {
 
 	_getHelpMsgForCmd:	function(cmd) {
 		if(this._cmds[cmd])
-			return this._cmds[cmd].help || this.default_help_msg;
+			return this._cmds[cmd].help || this.default_help_msg || "";
 	},
 
 	_parseCliArgs:		function(argv) {
