@@ -1,3 +1,4 @@
+var sprintf = require("printf");
 function AppRad() {
 	Function.prototype.Help = function(help){
 		this.help = help;
@@ -250,30 +251,48 @@ AppRad.prototype = {
 		;
 
 		this.register("help", function() {
-			var sprintf = require("printf");
-			var help = "Usage: " + process.argv[1] + " command [arguments]\n\n"
-				+ "Available Commands:\n";
-
 			var maxSize = 0;
-			this.commands.filter(function(cmd){
-				var ret = !this._cmds[cmd].skipHelp;
-				if(ret) {
-					maxSize = cmd.length > maxSize ? cmd.length : maxSize;
+			if(this.args && this.isCommand(this.args[0])) {
+				var cmd = this.args.shift();
+				var help = sprintf("Usage: %s %s [arguments]\n\n", process.argv[1], cmd);
+				if(this._getHelpMsgForCmd(cmd))
+					help += sprintf("%s\n\n", this._getHelpMsgForCmd(cmd));
+				if("options" in this.getCommand(cmd) && this.getCommand(cmd).options instanceof Object) {
+					help += "Available Options:\n";
+					Object.keys(this.getCommand(cmd).options).filter(function(opt){
+						var ret = !this.getCommand(cmd).skipHelp;
+						if(ret) {
+							maxSize = opt.length > maxSize ? opt.length : maxSize;
+						}
+						maxSize += 2;
+						return ret;
+					}.bind(this))
+					.sort().forEach(function(opt) {
+						var msg = this.getCommand(cmd).options[opt]
+							? "help" in this.getCommand(cmd).options[opt]
+								? this.getCommand(cmd).options[opt].help
+								: this.getCommand(cmd).options[opt]
+							: ""
+						;
+						if(typeof msg !== "string")
+							msg = "";
+						help += this._constructHelpOptions("--" + opt, msg, maxSize);
+					}.bind(this));
 				}
-				return ret;
-			}.bind(this)).sort().forEach(function(cmd) {
-				var formatedMsg = [];
-				var msgArr = this._getHelpMsgForCmd(cmd).split("");
-				while(msgArr.length) {
-					while(msgArr[0].match(/\s/))
-						msgArr.shift();
-					formatedMsg.push(msgArr.splice(0, 50).join(""));
-				}
-				help += sprintf("\t% -*s :  %-50s\n", cmd, maxSize, formatedMsg[0] || "");
-				formatedMsg.slice(1).forEach(function(line) {
-					help += sprintf("\t% -*s    %-50s\n", "", maxSize, line);
-				});
-			}.bind(this));
+			} else {
+				var help = sprintf("Usage: %s command [arguments]\n\n", process.argv[1]);
+				help += "Available Commands:\n";
+
+				this.commands.filter(function(cmd){
+					var ret = !this._cmds[cmd].skipHelp;
+					if(ret) {
+						maxSize = cmd.length > maxSize ? cmd.length : maxSize;
+					}
+					return ret;
+				}.bind(this)).sort().forEach(function(cmd) {
+					help += this._constructHelpOptions(cmd, this._getHelpMsgForCmd(cmd), maxSize);
+				}.bind(this));
+			}
 
 			return help;
 		}, "Shows this help message.");
@@ -285,6 +304,38 @@ AppRad.prototype = {
 		this.register("invalid", function() {
 			return this.execute("default");
 		}).skipHelp = true;
+	},
+
+	_constructHelpOptList:	function(list, obj) {
+		list.filter(function(cmd){
+			var ret = cmd in obj;
+			if(ret) {
+				maxSize = cmd.length > maxSize ? cmd.length : maxSize;
+			}
+			return ret;
+		}.bind(this)).sort().forEach(function(cmd) {
+			help += this._constructHelpOptions(cmd, this._getHelpMsgForCmd(cmd), maxSize);
+		}.bind(this));
+		return help;
+	},
+
+	_constructHelpOptions:	function(title, text, maxSize) {
+		var textLineSize	= 50;
+		var formatedMsg		= [];
+		var msgArr		= (text || "").split("");
+		var returnLine		= "";
+
+		while(msgArr.length) {
+			while(msgArr[0].match(/\s/))
+				msgArr.shift();
+			formatedMsg.push(msgArr.splice(0, textLineSize).join(""));
+		}
+
+		returnLine += sprintf("\t% -*s :  %-*s\n", title, maxSize, (formatedMsg[0] || ""), textLineSize);
+		formatedMsg.slice(1).forEach(function(line) {
+			returnLine += sprintf("\t% -*s    %-*s\n", "", maxSize, line, textLineSize);
+		});
+		return returnLine;
 	},
 
 	get unregisterCommand()	{
@@ -319,7 +370,7 @@ AppRad.prototype = {
 	getCommand:		function(cmdName) {
 		if(!this.isCommand(cmdName))
 			throw "Command not found";
-		return this._cmds.cmdName;
+		return this._cmds[cmdName];
 	},
 
 	/* control functions */
